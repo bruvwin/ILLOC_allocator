@@ -1,0 +1,22 @@
+//NAME: Edwin Munoz
+//NETID: eam20
+
+To clean all .class files:
+    make clean
+To build the Java program:
+    make build
+To run program:
+    java Main -<f> <fileName>
+
+Possible flags (<f> values):
+    -s: Reads the file specified by <name> and prints, to the standard output 
+    stream, a list of the tokens that the scanner found. Each token includes the
+    line number, the token’s type (or syntactic category), and its 
+    spelling (or lexeme)
+    -p: Reads the file specified by <name>, scans it and parses it, builds the 
+    intermediate representation, and reports either success or report all the 
+    errors that it finds in the input file.
+    -r: Reads the file specified by <name>, scans it, parses it, builds the 
+    intermediate representation, and prints out the information in the 
+    intermediate representation.
+
