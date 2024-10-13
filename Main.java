@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.Math;
+import java.util.Stack;
 public class Main {
 
     private static final String[] categories = {"LOAD", "STORE", "LOADI", "ADD", "SUB", "MULT", "LSHIFT", "RSHIFT", "OUTPUT", "NOP", "CONSTANT", "REGISTER", "COMMA", "INTO", "EOF", "EOL"};
@@ -13,36 +14,60 @@ public class Main {
     public static boolean failed;
     public static IR curr;
     public static int maxR;
+    public static int k;
+    public static Stack<Integer> rStack;
+    public static int[] vrToPr;
+    public static int[] prToVr;
+    public static int[] prNu;
+    public static int[] vrToSpill;
+    public static int memoryLoc;
+    public static int mark;
     public static void main(String[] args) throws Exception{
-        String[] flags = {"-h", "-x", "number"}; 
+        String[] flags = {"-h", "-x", "k"}; 
         String fileName = "";
-        boolean flagRepeat = false;
 
-        for(int i = 0; i < args.length; i++) {
-            if (args[i].equals("-h")) {
-                printHelp();
-                return;
-            } else if (args[i].equals("-x")) {
-                if (flag != -1) 
-                    flagRepeat = true;
-                else
-                    flag = 1;
-            } else {
-                fileName = args[i];
-                break;
+
+        // for(int i = 0; i < args.length; i++) {
+        //     if (args[i].equals("-h")) {
+        //         printHelp();
+        //         return;
+        //     } else if (args[i].equals("-x")) {
+        //         if (flag != -1) 
+        //             flagRepeat = true;
+        //         else
+        //             flag = 1;
+        //     } else {
+        //         fileName = args[i];
+        //         break;
+        //     }
+        // }
+        // if (flag == -1){
+        //     printError("Flag was not specified before file name");
+        //     return ;
+        // }
+        // if (fileName.isEmpty()){
+        //     printError("No target file name was specified.");
+        //     return ;
+        // }
+        // if (flagRepeat)
+        //     printError("Multiple flags were provided. Please only provide a single flag. Flag -"+ flags[flag] + " was chosen.");
+        if (args[0].equals("-h")){
+            printHelp();
+            return;
+        } else if (args.length < 3){
+            printError("Missing arguments.");
+            return;
+        } else if (args[0].equals("-x")) {
+            flag = 1;
+        } else {
+            flag = 2;
+            try {
+                k = Integer.parseInt(args[0]);
+            } catch (Exception e) {
+                printError("Invalid arguments.");
             }
         }
-        if (flag == -1){
-            printError("Flag was not specified before file name");
-            return ;
-        }
-        if (fileName.isEmpty()){
-            printError("No target file name was specified.");
-            return ;
-        }
-        if (flagRepeat)
-            printError("Multiple flags were provided. Please only provide a single flag. Flag -"+ flags[flag] + " was chosen.");
-        
+        fileName = args[1];
         IR head = new IR(0, -1, null);
         curr = head;
         bCount = 0;
@@ -51,8 +76,53 @@ public class Main {
         if (failed)
             return;
         rename();
-        printRenamed();
+        if (flag == 1)
+            printRenamed();
+        if (flag == 2)
+            renameAlloc();
+    }
+
+    public static void renameAlloc() {
+        curr = curr.next;
+        IR currOp = curr;
+        vrToPr = new int[maxR + 1];
+        prToVr = new int[k - 1];
+        prNu = new int[k - 1];
+        vrToSpill = new int[maxR];
         
+        for (int i = 0; i <= maxR; i++) {
+            vrToPr[i] = -1;
+        }
+        for (int i = 0; i < k - 1; i++) {
+            prToVr[i] = -1;
+            prNu[i] = -1;
+            rStack.push(i);
+        }
+        
+        while (curr != null) {
+            mark = -1;
+            if (curr.upcode == 0) { // load
+                Argument U = curr.arguments[0];
+                int pr = vrToPr[U.getVR()];
+                if (pr == -1) {
+                    U.setPR(getAPR(U.getVR(), U.getNU()));
+                    restore(U.getVR(), U.getPR());
+                } else {
+                    U.setPR(pr);
+                }
+            }
+        }
+
+    }
+    public static void restore(int vr, int pr) {
+
+    }
+    public static int getAPR(int vr, int nu) {
+        return 1;
+    }
+
+    public static void freeAPR(int pr) {
+
     }
 
     public static void printRenamed() {
@@ -594,6 +664,9 @@ class Argument {
     }
     public void setNU(int newNU) {
         this.NU = newNU;
+    }
+    public void setPR(int newPR) {
+        this.PR = newPR;
     }
 }
 
