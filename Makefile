@@ -7,7 +7,7 @@ clean:
 # Compile Java code into .class files
 build: 
 	javac -d . Main.java 
-#chmod +x 412fe
+#chmod +x 412alloc
 
 # Create a TAR file
 #tar: build

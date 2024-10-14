@@ -54,8 +54,8 @@ public class Main {
         if (args[0].equals("-h")){
             printHelp();
             return;
-        } else if (args.length < 3){
-            printError("Missing arguments.");
+        } else if (args.length < 2){
+            printError("Missing arguments. Bad");
             return;
         } else if (args[0].equals("-x")) {
             flag = 1;
@@ -78,18 +78,20 @@ public class Main {
         rename();
         if (flag == 1)
             printRenamed();
+        
+        curr = head.next;
         if (flag == 2)
             renameAlloc();
     }
 
     public static void renameAlloc() {
-        curr = curr.next;
         IR currOp = curr;
         vrToPr = new int[maxR + 1];
         prToVr = new int[k - 1];
         prNu = new int[k - 1];
         vrToSpill = new int[maxR];
-        
+        memoryLoc = 0;
+
         for (int i = 0; i <= maxR; i++) {
             vrToPr[i] = -1;
         }
@@ -110,15 +112,103 @@ public class Main {
                 } else {
                     U.setPR(pr);
                 }
+                if (U.getNU() == -1 && prToVr[U.getPR()] != -1) {
+                    freeAPR(U.getPR());
+                }
+
+                Argument D = curr.arguments[2];
+                D.setPR(getAPR(D.getVR(), D.getNU()));
+
+            } else if (curr.upcode == 1) {
+                Argument U1 = curr.arguments[1];
+                Argument U2 = curr.arguments[0];
+                int pr1 = vrToPr[U1.getVR()];
+                int pr2 = vrToPr[U2.getVR()];
+
+                if (pr1 == -1) {
+                    U1.setPR(getAPR(U1.getVR(), U1.getNU()));
+                    restore(U1.getVR(), U1.getPR());
+                } else {
+                    U1.setPR(pr1);
+                }
+                if (U1.getNU() == -1 && prToVr[U1.getPR()] != -1) {
+                    freeAPR(U1.getPR());
+                }
+                mark = pr1;
+                if (pr2 == -1) {
+                    U2.setPR(getAPR(U2.getVR(), U2.getNU()));
+                    restore(U2.getVR(), U2.getPR());
+                } else {
+                    U2.setPR(pr2);
+                }
+                if (U2.getNU() == -1 && prToVr[U2.getPR()] != -1) {
+                    freeAPR(U2.getPR());
+                }
+            } else if(curr.upcode == 2) {
+                Argument D = curr.arguments[2];
+                D.setPR(getAPR(D.getVR(), D.getNU()));
+            } else if(curr.upcode > 2 && curr.upcode < 8 ) {
+                Argument U1 = curr.arguments[0];
+                Argument U2 = curr.arguments[1];
+                int pr1 = vrToPr[U1.getVR()];
+                int pr2 = vrToPr[U2.getVR()];
+
+                if (pr1 == -1) {
+                    U1.setPR(getAPR(U1.getVR(), U1.getNU()));
+                    restore(U1.getVR(), U1.getPR());
+                } else {
+                    U1.setPR(pr1);
+                }
+                if (U1.getNU() == -1 && prToVr[U1.getPR()] != -1) {
+                    freeAPR(U1.getPR());
+                }
+                mark = pr1;
+                if (pr2 == -1) {
+                    U2.setPR(getAPR(U2.getVR(), U2.getNU()));
+                    restore(U2.getVR(), U2.getPR());
+                } else {
+                    U2.setPR(pr2);
+                }
+                if (U2.getNU() == -1 && prToVr[U2.getPR()] != -1) {
+                    freeAPR(U2.getPR());
+                }
+                mark = -1;
+                Argument D = curr.arguments[2];
+                D.setPR(getAPR(D.getVR(), D.getNU()));
             }
+            curr = curr.next;
         }
 
     }
+
     public static void restore(int vr, int pr) {
 
     }
+
     public static int getAPR(int vr, int nu) {
-        return 1;
+        int x;
+        if (rStack.size() > 0) 
+            x = rStack.pop();
+        else {
+            x = -1;
+            int latest = -1;
+            for (int i = 0; i < k - 1;i++) {
+                if (prNu[i] > latest && i != mark) {
+                    x = i;
+                    latest = prNu[i];
+                }
+            }
+            spill(x);
+        }
+        vrToPr[vr] = x;
+        prToVr[x] = vr;
+        prNu[x] = nu;
+        return x;
+    }
+
+    public static void spill(int x) {
+
+
     }
 
     public static void freeAPR(int pr) {
@@ -154,7 +244,6 @@ public class Main {
             lu[i] = -1;
             converter[i] = -1;
         }
-        int ind = bCount;
         while (curr.lineNum > 0) {
             // Each definition
             if(curr.upcode > -1 && curr.upcode < 8 && curr.upcode != 1) {
@@ -174,36 +263,35 @@ public class Main {
                     converter[curr.arguments[0].getSR()] = virtualName++;
                 curr.arguments[0].setVR(converter[curr.arguments[0].getSR()]);
                 curr.arguments[0].setNU(lu[curr.arguments[0].getSR()]);
-                lu[curr.arguments[0].getSR()] = ind;
+                lu[curr.arguments[0].getSR()] = curr.lineNum;
             }
             if (curr.upcode == 1) {
                 if (converter[curr.arguments[1].getSR()] == -1)
                         converter[curr.arguments[1].getSR()] = virtualName++;
                 curr.arguments[1].setVR(converter[curr.arguments[1].getSR()]);
                 curr.arguments[1].setNU(lu[curr.arguments[1].getSR()]);
-                lu[curr.arguments[1].getSR()] = ind;
+                lu[curr.arguments[1].getSR()] = curr.lineNum;
                 if (converter[curr.arguments[0].getSR()] == -1)
                     converter[curr.arguments[0].getSR()] = virtualName++;
                 curr.arguments[0].setVR(converter[curr.arguments[0].getSR()]);
                 curr.arguments[0].setNU(lu[curr.arguments[0].getSR()]);
-                lu[curr.arguments[0].getSR()] = ind;
+                lu[curr.arguments[0].getSR()] = curr.lineNum;
             }
             if(curr.upcode > 2 && curr.upcode < 8 ) {
                 if (converter[curr.arguments[0].getSR()] == -1)
                     converter[curr.arguments[0].getSR()] = virtualName++;
                 curr.arguments[0].setVR(converter[curr.arguments[0].getSR()]);
                 curr.arguments[0].setNU(lu[curr.arguments[0].getSR()]);
-                lu[curr.arguments[0].getSR()] = ind;
+                lu[curr.arguments[0].getSR()] = curr.lineNum;
 
                 if (curr.upcode > 2) {
                     if (converter[curr.arguments[1].getSR()] == -1)
                         converter[curr.arguments[1].getSR()] = virtualName++;
                     curr.arguments[1].setVR(converter[curr.arguments[1].getSR()]);
                     curr.arguments[1].setNU(lu[curr.arguments[1].getSR()]);
-                    lu[curr.arguments[1].getSR()] = ind;
+                    lu[curr.arguments[1].getSR()] = curr.lineNum;
                 }
             }
-            ind--;
             curr = curr.prev;
         }
 
