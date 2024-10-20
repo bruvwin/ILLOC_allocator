@@ -90,7 +90,7 @@ public class Main {
         vrToPr = new int[maxR + 1];
         prToVr = new int[k - 1];
         prNu = new int[k - 1];
-        vrToSpill = new int[maxR];
+        vrToSpill = new int[maxR + 1];
         memoryLoc = 32768;
         rStack = new Stack<Integer>();
 
@@ -117,7 +117,7 @@ public class Main {
                 if (U.getNU() == -1 && prToVr[U.getPR()] != -1) {
                     freeAPR(U.getPR());
                 }
-
+                mark = -1;
                 Argument D = curr.arguments[2];
                 D.setPR(getAPR(D.getVR(), D.getNU()));
 
@@ -218,8 +218,8 @@ public class Main {
         }
             
         else {
-            x = -1;
-            int latest = -1;
+            x = -2;
+            int latest = -2;
             for (int i = 0; i < k - 1; i++) {
                 if (prNu[i] > latest && i != mark) {
                     x = i;
@@ -350,8 +350,9 @@ public class Main {
                 }
             }
             curr = curr.prev;
-            maxR = virtualName - 1;
+            
         }
+        maxR = virtualName - 1;
 
     }
 
