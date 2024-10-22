@@ -26,31 +26,6 @@ public class Main {
         //String[] flags = {"-h", "-x", "k"}; 
         String fileName = "";
 
-
-        // for(int i = 0; i < args.length; i++) {
-        //     if (args[i].equals("-h")) {
-        //         printHelp();
-        //         return;
-        //     } else if (args[i].equals("-x")) {
-        //         if (flag != -1) 
-        //             flagRepeat = true;
-        //         else
-        //             flag = 1;
-        //     } else {
-        //         fileName = args[i];
-        //         break;
-        //     }
-        // }
-        // if (flag == -1){
-        //     printError("Flag was not specified before file name");
-        //     return ;
-        // }
-        // if (fileName.isEmpty()){
-        //     printError("No target file name was specified.");
-        //     return ;
-        // }
-        // if (flagRepeat)
-        //     printError("Multiple flags were provided. Please only provide a single flag. Flag -"+ flags[flag] + " was chosen.");
         if (args[0].equals("-h")){
             printHelp();
             return;
@@ -91,13 +66,13 @@ public class Main {
         prToVr = new int[k - 1];
         prNu = new int[k - 1];
         vrToSpill = new int[maxR + 1];
-        memoryLoc = 32768;
+        memoryLoc = 65536;
         rStack = new Stack<Integer>();
 
         for (int i = 0; i <= maxR; i++) {
             vrToPr[i] = -1;
         }
-        for (int i = 0; i < k - 1; i++) {
+        for (int i = k - 2; i > -1; i--) {
             prToVr[i] = -1;
             prNu[i] = -1;
             rStack.push(i);
@@ -125,7 +100,6 @@ public class Main {
                 Argument U1 = curr.arguments[1];
                 Argument U2 = curr.arguments[0];
                 int pr1 = vrToPr[U1.getVR()];
-                int pr2 = vrToPr[U2.getVR()];
 
                 if (pr1 == -1) {
                     U1.setPR(getAPR(U1.getVR(), U1.getNU()));
@@ -133,15 +107,16 @@ public class Main {
                 } else {
                     U1.setPR(pr1);
                 }
-                if (U1.getNU() == -1 && prToVr[U1.getPR()] != -1) {
-                    freeAPR(U1.getPR());
-                }
-                mark = pr1;
+                mark = U1.getPR();
+                int pr2 = vrToPr[U2.getVR()];
                 if (pr2 == -1) {
                     U2.setPR(getAPR(U2.getVR(), U2.getNU()));
                     restore(U2.getVR(), U2.getPR());
                 } else {
                     U2.setPR(pr2);
+                }
+                if (U1.getNU() == -1 && prToVr[U1.getPR()] != -1) {
+                    freeAPR(U1.getPR());
                 }
                 if (U2.getNU() == -1 && prToVr[U2.getPR()] != -1) {
                     freeAPR(U2.getPR());
@@ -196,7 +171,7 @@ public class Main {
         Argument[] loadIargs = new Argument[]{l1, null, l2};
         IR loadI = new IR(curr.lineNum, 2, loadIargs);
 
-        Argument lo1 = new Argument(k - 1, k - 1, k - 1, curr.lineNum);
+        Argument lo1 = new Argument(-3, k - 1, k - 1, curr.lineNum);
         Argument lo2 = new Argument(pr, pr, pr, curr.lineNum);
         Argument[] loargs = new Argument[]{lo1, null, lo2};
         IR load = new IR(curr.lineNum, 0, loargs);
@@ -243,7 +218,7 @@ public class Main {
         Argument[] loadIargs = new Argument[]{l1, null, l2};
         IR loadIr = new IR(curr.lineNum, 2, loadIargs);
 
-        Argument s1 = new Argument(x, x, x, curr.lineNum);
+        Argument s1 = new Argument(-4, x, x, curr.lineNum);
         Argument s2 = new Argument(k - 1, k - 1, k - 1, curr.lineNum);
         Argument[] storeArgs = new Argument[]{s1, s2, null};
         IR store = new IR(curr.lineNum, 1, storeArgs);
@@ -268,22 +243,41 @@ public class Main {
 
     public static void printRenamed() {
         curr = curr.next;
+        int cycle = 0;
         while (curr != null) {
+            
             if (curr.upcode == 0) {
-                System.out.println(categories[curr.upcode].toLowerCase() + " r" + curr.arguments[0].getPR() + " => r"+ curr.arguments[2].getPR());
+                String result = categories[curr.upcode].toLowerCase() + " r" + curr.arguments[0].getPR() + " => r"+ curr.arguments[2].getPR() + " // Cycle "+cycle+" line: "+curr.lineNum;
+                if (curr.arguments[0].getSR() == -3) {
+                    result += " restore";
+                }
+                System.out.println(result);
+                cycle += 2;
             } else if (curr.upcode == 1) {
-                System.out.println(categories[curr.upcode].toLowerCase() + " r" + curr.arguments[0].getPR() + " => r"+ curr.arguments[1].getPR());
+                String result = categories[curr.upcode].toLowerCase() + " r" + curr.arguments[0].getPR() + " => r"+ curr.arguments[1].getPR() + " // Cycle: "+cycle+" line: "+curr.lineNum;
+                if (curr.arguments[0].getSR() == -4) {
+                    result += " spill";
+                }
+                System.out.println(result);
+                cycle += 2;
             }
             else if (curr.upcode == 2) {
-                System.out.println("loadI " + curr.arguments[0].getPR() + " => r"+ curr.arguments[2].getPR());
+                
+                String result = "loadI " + curr.arguments[0].getPR() + " => r"+ curr.arguments[2].getPR() + " // Cycle "+cycle+" line: "+curr.lineNum;
+                if (curr.arguments[0].getPR() % 4 != 0) {
+                    result += " BAD";
+                }
+                System.out.println(result);
             } else if (curr.upcode > 2 && curr.upcode < 8) {
-                System.out.println(categories[curr.upcode].toLowerCase() + " r" + curr.arguments[0].getPR() + ", r" + curr.arguments[1].getPR() +" => r"+ curr.arguments[2].getPR());
+                System.out.println(categories[curr.upcode].toLowerCase() + " r" + curr.arguments[0].getPR() + ", r" + curr.arguments[1].getPR() +" => r"+ curr.arguments[2].getPR() + " // Cycle "+cycle+" line: "+curr.lineNum);
             } else if (curr.upcode == 8) {
-                System.out.println("output " + curr.arguments[0].getPR());
+                System.out.println("output " + curr.arguments[0].getPR() + " // Cycle "+cycle);
             } else if (curr.upcode == 9) {
-                System.out.println("nop");
+                System.out.println("nop // Cycle "+cycle+" line: "+curr.lineNum);
             }
             curr = curr.next;
+            cycle++;
+
         }
     }
 
@@ -756,12 +750,12 @@ public class Main {
     }
     
     public static void printHelp() {
-        System.out.println("412fe -s <name>  :");
-        System.out.println("Reads the file specified by <name> and prints, to the standard output stream, a list of the tokens that the scanner found. Each token includes the line number, the token’s type (or syntactic category), and its spelling (or lexeme). ");
-        System.out.println("412fe -p <name>  :");
-        System.out.println("Reads the file specified by <name>, scans it and parses it, builds the intermediate representation, and reports either success or report all the errors that it finds in the input file. ");
-        System.out.println("412fe -r <name>  :");
-        System.out.println("Reads the file specified by <name>, scans it, parses it, builds the intermediate representation, and prints out the information in the intermediate representation.");
+        System.out.println("412alloc -h:");
+        System.out.println("When passed the -h flag, 412alloc prints a list of the valid commandline arguments that it accepts, along with a concise explanation for that option.");
+        System.out.println("412alloc -x <name>  :");
+        System.out.println("The -x flag will only be used for Code Check 1, with <name> as Linux pathname. With this flag, 412alloc scans and parses the input block. It then performs renaming on the code in the input block and prints the results to the standard output stream (stdout). ");
+        System.out.println("412alloc k <name>  :");
+        System.out.println("   In this format, k is the number of registers available to the allocator (3 ≤ k ≤ 64) and <name> is a Linux pathname to the file containing the input block. The pathname can be either a relative pathname or an absolute pathname. If k is outside the valid range or it cannot open the file specified by <name>, 412alloc prints a reasonable error message and exit. If the parameters are valid, 412alloc scans, parses, and allocates the code in the input block so that it uses only registers r0 to rk-1 and prints the resulting code to the standard output stream (stdout). ");
     }
 
     public static void printError(String msg) {
