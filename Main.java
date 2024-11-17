@@ -2,6 +2,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.Math;
+import java.util.HashSet;
 import java.util.Stack;
 public class Main {
 
@@ -22,26 +23,17 @@ public class Main {
     public static int[] vrToSpill;
     public static int memoryLoc;
     public static int mark;
+    public static HashSet<depNode> ready;
     public static void main(String[] args) throws Exception{
-        //String[] flags = {"-h", "-x", "k"}; 
         String fileName = "";
 
         if (args[0].equals("-h")){
             printHelp();
             return;
         } else if (args.length < 2){
-            printError("Missing arguments. Bad");
+            printError("Missing arguments. ");
             return;
-        } else if (args[0].equals("-x")) {
-            flag = 1;
-        } else {
-            flag = 2;
-            try {
-                k = Integer.parseInt(args[0]);
-            } catch (Exception e) {
-                printError("Invalid arguments.");
-            }
-        }
+        } 
         fileName = args[1];
         IR head = new IR(0, -1, null);
         curr = head;
@@ -51,13 +43,97 @@ public class Main {
         if (failed)
             return;
         rename();
-        
-        if (flag == 2) {
-            curr = head.next;
-            renameAlloc();
+        curr = head; 
+        buildDependance();   
+
+    }
+
+    public static void buildDependance() {
+        depNode[] M = new depNode[maxR];
+        depNode latestStore = null;
+        depNode latestOutput = null;
+        depNode latestLoad = null;
+        while (curr != null) {
+            depNode node = new depNode(curr);
+            if (curr.upcode == 0) { //load
+                // add to default latency
+                node.slow(5);
+                //conflict
+                if (latestStore != null) {
+                    node.children.add(latestStore);
+                    latestStore.parents.add(node);
+                }
+                //use
+                node.children.add(M[curr.arguments[0].getVR()]);
+                M[curr.arguments[0].getVR()].parents.add(node);
+                //define
+                if (M[curr.arguments[2].getVR()] == null) //vr not defined yet
+                    ready.add(node);
+                M[curr.arguments[2].getVR()] = node;
+                latestLoad = node;
+                
+            } else if (curr.upcode == 1) { //store
+                // add to default latency
+                node.slow(5);
+                //use
+                node.children.add(M[curr.arguments[0].getVR()]);
+                M[curr.arguments[0].getVR()].parents.add(node);
+                node.children.add(M[curr.arguments[1].getVR()]);
+                M[curr.arguments[1].getVR()].parents.add(node);
+                //serializatioin
+                if (latestStore != null) {
+                    node.children.add(latestStore);
+                    latestStore.parents.add(node);
+                    latestStore.cereals.add(node);
+                }
+                if(latestLoad != null) {
+                    node.children.add(latestLoad);
+                    latestLoad.parents.add(node);
+                    latestLoad.cereals.add(node);
+                }
+                if(latestOutput != null) {
+                    node.children.add(latestOutput);
+                    latestOutput.parents.add(node);
+                    latestOutput.cereals.add(node);
+                }
+                latestStore = node;
+            } else if (curr.upcode == 2) { //loadI
+                //define
+                if (M[curr.arguments[2].getVR()] == null) //vr not defined yet
+                    ready.add(node);
+                M[curr.arguments[2].getVR()] = node;
+            } else if (curr.upcode > 2 && curr.upcode < 8) { //arith
+                // add to default latency
+                if (curr.upcode == 5) { //only for mult
+                    node.slow(2);
+                }
+                //use
+                node.children.add(M[curr.arguments[0].getVR()]);
+                M[curr.arguments[0].getVR()].parents.add(node);
+                node.children.add(M[curr.arguments[1].getVR()]);
+                M[curr.arguments[1].getVR()].parents.add(node); 
+                //define
+                if (M[curr.arguments[2].getVR()] == null) //vr not defined yet
+                    ready.add(node);
+                M[curr.arguments[2].getVR()] = node;               
+            } else if (curr.upcode == 8) { //output
+                //conflict
+                if (latestStore != null) {
+                    node.children.add(latestStore);
+                    latestStore.parents.add(node);
+                }
+            
+                //serializatioin
+                if (latestOutput != null) {
+                    node.children.add(latestOutput);
+                    latestOutput.parents.add(node);
+                    latestOutput.cereals.add(node);
+                }
+                latestOutput = node;
+            }
+
+            curr = curr.next;
         }
-        curr = head;    
-        printRenamed();
     }
 
     public static void renameAlloc() {
@@ -378,7 +454,7 @@ public class Main {
                 } else if (upcode[0] == 8) {
                     finishOutput();
                 } else if (upcode[0] == 9) {
-                    finishNop();
+                    continue;
                 } else {
                     printError("Block does not start with an upcode.");
                 }
@@ -811,3 +887,28 @@ class Argument {
     }
 }
 
+class depNode {
+    public HashSet<depNode> parents;
+    public HashSet<depNode> children;
+    public HashSet<depNode> cereals;
+    public IR op;
+    public int cycleStart;
+    public int latencyLeft;
+    public depNode(IR op) {
+        this.op = op;
+        this.latencyLeft = 1;
+        parents = new HashSet<depNode>();
+        children = new HashSet<depNode>();
+        cereals = new HashSet<depNode>();
+    }
+
+    public void slow(int amount) {
+        this.latencyLeft += amount;
+    }
+
+    public void removeCereals() {
+        this.parents.removeAll(cereals);
+    }
+
+ 
+}
